@@ -1,16 +1,24 @@
 <script setup>
 import { ref, onMounted } from "vue";
 
-const view = ref("auth"); // 'auth' | 'dashboard'
-const authTab = ref("login"); // 'login' | 'register'
+const view = ref("auth");
+const authTab = ref("login");
 const user = ref(null);
 const files = ref([]);
-const error = ref("");
 const loading = ref(false);
 
 const loginForm = ref({ nim: "", password: "" });
 const registerForm = ref({ name: "", nim: "", email: "", password: "" });
 const selectedFile = ref(null);
+
+const toast = ref({ message: "", type: "" });
+let toastTimer = null;
+
+function showToast(message, type = "error") {
+    clearTimeout(toastTimer);
+    toast.value = { message, type };
+    toastTimer = setTimeout(() => (toast.value = { message: "", type: "" }), 3000);
+}
 
 onMounted(async () => {
     const res = await fetch("/api/me");
@@ -22,7 +30,6 @@ onMounted(async () => {
 });
 
 async function login() {
-    error.value = "";
     loading.value = true;
     const res = await fetch("/api/login", {
         method: "POST",
@@ -32,7 +39,7 @@ async function login() {
     const data = await res.json();
     loading.value = false;
     if (!res.ok) {
-        error.value = data.error;
+        showToast(data.error);
         return;
     }
     user.value = data;
@@ -41,7 +48,6 @@ async function login() {
 }
 
 async function register() {
-    error.value = "";
     loading.value = true;
     const res = await fetch("/api/register", {
         method: "POST",
@@ -51,7 +57,7 @@ async function register() {
     const data = await res.json();
     loading.value = false;
     if (!res.ok) {
-        error.value = data.error;
+        showToast(data.error);
         return;
     }
     user.value = data;
@@ -73,7 +79,6 @@ async function fetchFiles() {
 
 async function uploadFile() {
     if (!selectedFile.value) return;
-    error.value = "";
     loading.value = true;
     const form = new FormData();
     form.append("file", selectedFile.value);
@@ -81,15 +86,21 @@ async function uploadFile() {
     loading.value = false;
     if (!res.ok) {
         const d = await res.json();
-        error.value = d.error;
+        showToast(d.error);
         return;
     }
     selectedFile.value = null;
+    showToast("File uploaded successfully.", "success");
     await fetchFiles();
 }
 
 async function deleteFile(originalName) {
-    await fetch(`/api/files/${originalName}`, { method: "DELETE" });
+    const res = await fetch(`/api/files/${originalName}`, { method: "DELETE" });
+    if (!res.ok) {
+        showToast("Failed to delete file.");
+        return;
+    }
+    showToast("File deleted.", "success");
     await fetchFiles();
 }
 
@@ -103,6 +114,24 @@ function onFileChange(e) {
 </script>
 
 <template>
+    <!-- Toast notification -->
+    <div
+        v-if="toast.message"
+        :style="{
+            position: 'fixed',
+            top: '16px',
+            right: '16px',
+            padding: '12px 20px',
+            borderRadius: '6px',
+            color: 'white',
+            fontWeight: 'bold',
+            zIndex: 1000,
+            background: toast.type === 'success' ? '#16a34a' : '#dc2626',
+        }"
+    >
+        {{ toast.message }}
+    </div>
+
     <!-- Auth View -->
     <div v-if="view === 'auth'">
         <h1>Nusantara Tech</h1>
@@ -111,8 +140,6 @@ function onFileChange(e) {
             <button @click="authTab = 'login'">Login</button>
             <button @click="authTab = 'register'">Register</button>
         </div>
-
-        <p v-if="error">{{ error }}</p>
 
         <!-- Login Form -->
         <form v-if="authTab === 'login'" @submit.prevent="login">
@@ -165,7 +192,6 @@ function onFileChange(e) {
         <hr />
 
         <h2>Upload File</h2>
-        <p v-if="error">{{ error }}</p>
         <form @submit.prevent="uploadFile">
             <input type="file" @change="onFileChange" />
             <button type="submit" :disabled="loading || !selectedFile">
