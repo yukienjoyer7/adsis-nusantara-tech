@@ -1,7 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Inter', sans-serif;
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: 'Inter', ui-sans-serif, system-ui;
+    background-color: #fbf9f4;
+    color: #1b1c19;
+  }
+}
+
+@layer components {
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 20px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+    vertical-align: middle;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-on-primary font-button text-button py-3 px-6 rounded-full hover:bg-ink transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2;
+  }
+
+  .btn-secondary-link {
+    @apply text-ink hover:text-action-blue underline transition-colors duration-200 font-body-md text-body-md;
+  }
+
+  .input-field {
+    @apply w-full h-12 px-md bg-canvas-white border border-hairline rounded-lg focus:outline-none focus:ring-2 focus:ring-form-focus-violet focus:border-form-focus-violet transition-colors font-body-md text-body-md text-on-surface placeholder:text-muted-slate;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-sm px-4 py-sm rounded-md font-label-mono text-label-mono uppercase text-on-surface-variant hover:bg-surface-container-high transition-all duration-200 ease-in-out;
+  }
+
+  .nav-item-active {
+    @apply flex items-center gap-sm px-4 py-sm rounded-md font-label-mono text-label-mono uppercase bg-surface-variant text-primary font-bold;
+  }
+
+  .image-card {
+    @apply flex flex-col bg-canvas-white border border-hairline rounded-card overflow-hidden hover:shadow-sm transition-all duration-200;
+  }
 }
