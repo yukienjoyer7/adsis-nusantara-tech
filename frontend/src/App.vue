@@ -1,5 +1,75 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, defineComponent, h, watch } from "vue";
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Arahkan worker ke file yang disertakan bersama pdfjs-dist
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url
+).href;
+
+/**
+ * Komponen inline yang merender halaman pertama PDF ke <canvas>.
+ * Props:
+ *   src  – URL string ATAU File object
+ */
+const PdfCanvas = defineComponent({
+    name: 'PdfCanvas',
+    props: {
+        src: { required: true },
+    },
+    setup(props) {
+        const canvasRef = ref(null);
+        const error = ref(false);
+
+        async function render() {
+            error.value = false;
+            if (!canvasRef.value) return;
+            const canvas = canvasRef.value;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            try {
+                // Bisa menerima File object atau URL string
+                const source = props.src instanceof File
+                    ? { data: await props.src.arrayBuffer() }
+                    : props.src;
+
+                const pdf = await pdfjsLib.getDocument(source).promise;
+                const page = await pdf.getPage(1);
+
+                // Render dengan skala yang pas di 400px lebar canvas
+                const viewport = page.getViewport({ scale: 1 });
+                const scale = 400 / viewport.width;
+                const scaled = page.getViewport({ scale });
+
+                canvas.width = scaled.width;
+                canvas.height = scaled.height;
+
+                await page.render({ canvasContext: ctx, viewport: scaled }).promise;
+            } catch (e) {
+                console.warn('PdfCanvas render error:', e);
+                error.value = true;
+            }
+        }
+
+        onMounted(render);
+        watch(() => props.src, render);
+
+        return () => h('div', { class: 'w-full h-full relative' }, [
+            error.value
+                ? h('div', { class: 'w-full h-full flex flex-col items-center justify-center text-muted-slate gap-2' }, [
+                    h('span', { class: 'material-symbols-outlined', style: 'font-size:40px' }, 'picture_as_pdf'),
+                    h('span', { class: 'text-xs font-mono uppercase' }, 'PDF'),
+                ])
+                : h('canvas', {
+                    ref: canvasRef,
+                    class: 'w-full h-full object-cover',
+                    style: 'object-fit: cover;',
+                }),
+        ]);
+    },
+});
 
 const view = ref("auth");
 const authTab = ref("login");
@@ -116,13 +186,8 @@ function handleFileSelection(file) {
         selectedFile.value = null;
         return;
     }
-    if (!isImage(file.name)) {
-        showToast("Only image files are allowed to be uploaded.", "error");
-        selectedFile.value = null;
-        return;
-    }
-    if (file.size > 1 * 1024 * 1024) {
-        showToast("File is too large. Maximum size is 1MB.", "error");
+    if (file.size > 10 * 1024 * 1024) {
+        showToast("File is too large. Maximum size is 10MB.", "error");
         selectedFile.value = null;
         return;
     }
@@ -173,6 +238,10 @@ function getFileExt(name) {
 
 function isImage(name) {
     return /\.(png|jpg|jpeg|gif|webp|svg|bmp)$/i.test(name);
+}
+
+function isPdf(name) {
+    return /\.pdf$/i.test(name);
 }
 
 function getObjectUrl(file) {
@@ -306,7 +375,7 @@ function getObjectUrl(file) {
             <nav class="flex-1 flex flex-col gap-1">
                 <button @click="uploadView = false" :class="!uploadView ? 'nav-item-active' : 'nav-item'"
                     class="text-left w-full">
-                    <span class="material-symbols-outlined">image</span>
+                    <span class="material-symbols-outlined">folder_open</span>
                     Library
                 </button>
                 <button @click="uploadView = true" :class="uploadView ? 'nav-item-active' : 'nav-item'"
@@ -357,8 +426,8 @@ function getObjectUrl(file) {
                         <p class="text-slate text-sm mt-1">Manage and curate your dataset assets.</p>
                     </div>
                     <button @click="uploadView = true" class="btn-primary shrink-0">
-                        <span class="material-symbols-outlined" style="font-size:18px;">add_photo_alternate</span>
-                        Add New Image
+                        <span class="material-symbols-outlined" style="font-size:18px;">note_add</span>
+                        Add New File
                     </button>
                 </div>
 
@@ -381,6 +450,12 @@ function getObjectUrl(file) {
                             <img v-if="isImage(file.original_name)" :src="`/api/files/${file.original_name}`"
                                 :alt="file.original_name"
                                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                            <!-- PDF thumbnail via PDF.js canvas -->
+                            <div v-else-if="isPdf(file.original_name)" class="w-full h-full overflow-hidden">
+                                <PdfCanvas :src="`/api/files/${file.original_name}`"
+                                    class="w-full h-full object-cover" />
+                                <span class="absolute top-2 right-2 font-mono text-[10px] uppercase tracking-widest bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-semibold z-10">PDF</span>
+                            </div>
                             <div v-else
                                 class="w-full h-full flex flex-col items-center justify-center text-muted-slate">
                                 <span class="material-symbols-outlined" style="font-size:40px;">description</span>
@@ -396,7 +471,7 @@ function getObjectUrl(file) {
                                 </h3>
                                 <span
                                     class="font-mono text-xs uppercase text-slate shrink-0 bg-surface-container px-2 py-0.5 rounded">{{
-                                    getFileExt(file.original_name) }}</span>
+                                        getFileExt(file.original_name) }}</span>
                             </div>
                             <p class="text-xs text-slate">{{ formatDate(file.uploaded_at) }}</p>
                             <div class="flex items-center gap-4 mt-1 pt-2 border-t border-hairline">
@@ -495,16 +570,29 @@ function getObjectUrl(file) {
 
                                 <!-- Preview area -->
                                 <div
-                                    class="flex-1 bg-surface-container-lowest p-4 relative flex items-center justify-center min-h-[300px] md:min-h-[400px]">
-                                    <!-- Checkered bg -->
-                                    <div class="absolute inset-0 z-0 opacity-20"
+                                    class="flex-1 bg-surface-container-lowest relative flex items-center justify-center min-h-[300px] md:min-h-[480px]"
+                                    :class="selectedFile && isPdf(selectedFile.name) ? 'p-0' : 'p-4'">
+                                    <!-- Checkered bg (disembunyikan saat PDF) -->
+                                    <div v-if="!(selectedFile && isPdf(selectedFile.name))" class="absolute inset-0 z-0 opacity-20"
                                         style="background-image: linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px;">
                                     </div>
 
+                                    <!-- Image preview -->
                                     <template v-if="selectedFile && isImage(selectedFile.name)">
                                         <img :src="getObjectUrl(selectedFile)" :alt="selectedFile.name"
                                             class="relative z-10 max-w-full max-h-[500px] object-contain rounded shadow-sm border border-hairline" />
                                     </template>
+
+                                    <!-- PDF preview: iframe scrollable (gaya Google Drive) -->
+                                    <template v-else-if="selectedFile && isPdf(selectedFile.name)">
+                                        <iframe
+                                            :src="getObjectUrl(selectedFile) + '#toolbar=1&navpanes=0'"
+                                            class="absolute inset-0 w-full h-full border-none z-10"
+                                            :key="selectedFile.name"
+                                        />
+                                    </template>
+
+                                    <!-- Dokumen lain: icon + info -->
                                     <template v-else-if="selectedFile">
                                         <div class="relative z-10 flex flex-col items-center gap-3 text-slate">
                                             <span class="material-symbols-outlined"
@@ -512,9 +600,11 @@ function getObjectUrl(file) {
                                             <p class="text-sm font-medium text-primary">{{ selectedFile.name }}</p>
                                             <p class="font-mono text-xs uppercase text-slate">{{
                                                 getFileExt(selectedFile.name) }} · {{ (selectedFile.size / 1024 /
-                                                1024).toFixed(2) }} MB</p>
+                                                    1024).toFixed(2) }} MB</p>
                                         </div>
                                     </template>
+
+                                    <!-- Placeholder kosong -->
                                     <template v-else>
                                         <div class="relative z-10 flex flex-col items-center gap-3 text-muted-slate">
                                             <span class="material-symbols-outlined"
@@ -545,7 +635,7 @@ function getObjectUrl(file) {
                 <button @click="uploadView = false"
                     class="flex-1 flex flex-col items-center py-3 gap-1 text-xs font-mono uppercase tracking-widest transition-colors"
                     :class="!uploadView ? 'text-primary' : 'text-slate'">
-                    <span class="material-symbols-outlined" style="font-size:20px;">image</span>
+                    <span class="material-symbols-outlined" style="font-size:20px;">folder_open</span>
                     Library
                 </button>
                 <button @click="uploadView = true"
