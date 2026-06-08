@@ -128,7 +128,8 @@ docker compose down -v     # stop containers, delete all data
 <img width="1792" height="1074" alt="Screenshot 2026-06-08 at 13 02 53" src="https://github.com/user-attachments/assets/83cade7b-e2a7-4b37-b461-d2ea0c86afbc" />
 
 ### MinIO Bucket
-![MinIO](screenshots/minio.png)
+<img width="1772" height="1054" alt="Screenshot 2026-06-08 at 15 28 51" src="https://github.com/user-attachments/assets/f8dafcf9-ee1e-4663-aebf-94d18d146f61" />
+<img width="1792" height="1074" alt="Screenshot 2026-06-08 at 15 33 35" src="https://github.com/user-attachments/assets/bfc0124f-6ad4-47ff-8347-fd03200c0901" />
 
 ### pgAdmin
-![pgAdmin](screenshots/pgadmin.png)
+<img width="1772" height="1054" alt="Screenshot 2026-06-08 at 15 32 16" src="https://github.com/user-attachments/assets/ec2ee3e1-a544-4d38-a98f-049e00b1a443" />
